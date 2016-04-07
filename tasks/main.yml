@@ -1,0 +1,25 @@
+- name: Dokku version
+  shell: dokku version
+  register: current_dokku_version
+  ignore_errors: True
+
+- name: "Install dokku"
+  shell: "wget -qO- https://raw.github.com/dokku/dokku/v{{ dokku_version }}/bootstrap.sh | sudo DOKKU_TAG=v{{ dokku_version }} bash"
+  when: dokku_version != current_dokku_version.stdout
+
+- name: "Configure dokku vhost"
+  copy: dest=/home/dokku/VHOST content={{ dokku_vhost }}
+
+- name: "Install plugins"
+  shell:
+    cmd: "dokku plugin:install {{ item.repo }}"
+    creates: /var/lib/dokku/plugins/available/{{ item.name }}
+  with_items: "{{dokku_plugins}}"
+
+- name: Delete container after run by default
+  shell:
+    cmd: dokku config:set --global DOKKU_RM_CONTAINER=1
+
+- name: Add dokku access
+  shell: "echo '{{ item }}' > /tmp/pub_key && sudo sshcommand acl-remove dokku [description] && cat /tmp/pub_key | sudo sshcommand acl-add dokku [description] "
+  with_items: "{{public_key}}"
